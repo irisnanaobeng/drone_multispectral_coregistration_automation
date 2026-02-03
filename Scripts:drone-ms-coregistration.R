@@ -1,11 +1,10 @@
 ---
-  title: "DJI Multispectral Coregistration & Visualization"
+title: "DJI Multispectral Coregistration & Visualization"
 author: "Iris Nana Obeng"
 date: "2026-02-03"
 output: github_document
 ---
   
-  ```{r setup, include=FALSE}
 
 # Setup: Loading required packages
 
@@ -13,14 +12,13 @@ library(terra)
 
 # Set working directory
 setwd("~/Desktop/drone ms coregistration")
-```
+
 
 ## 1. Loading DJI multispectral bands
 
 The dataset includes 3 bands: Green, Red, NIR.
 The RED band will be used as reference for alignment.
 
-```{r load-bands, message=FALSE}
 
 # Load multispectral bands
 files <- c(
@@ -43,7 +41,7 @@ names(band_matrices) <- band_names
 
 Defining functions to shift bands relative to the reference RED band, maximizing correlation.
 
-```{r align-bands}
+
 align_band_simple <- function(ref_mat, target_mat, max_shift=20) {
   best_cor <- -Inf; best_dx <- 0; best_dy <- 0
   rows <- nrow(ref_mat); cols <- ncol(ref_mat)
@@ -68,11 +66,10 @@ apply_shift <- function(mat, dx, dy) {
   shifted[r_dst[ok_r], c_dst[ok_c]] <- mat[(1:rows)[ok_r], (1:cols)[ok_c]]
   shifted
 }
-```
+
 
 ## 2.1 Aligning Green and NIR bands to Red band (reference)
 
-```{r align-green-nir}
 ref_red <- band_matrices$Red
 aligned_matrices <- list(Red=ref_red)
 for(b in c("Green","NIR")) {
@@ -85,7 +82,7 @@ for(b in c("Green","NIR")) {
 
 Normalize values to [0,1] for plotting and replace NA values.
 
-```{r normalize-replace-na} 
+
 normalize <- function(x){ r<-range(x,na.rm=TRUE); (x-r[1])/(r[2]-r[1]) }
 replace_na <- function(x){ x[is.na(x)]<-0; x }
 
@@ -100,7 +97,6 @@ N_a <- replace_na(normalize(aligned_matrices$NIR))
 
 ## 3a. Plotting Helper Function (with Border & Caption)
 
-```{r plot-function}
 plot_rgb <- function(r, g, b, main_title, subtitle=NULL, border=TRUE) {
   arr <- array(c(r,g,b), dim=c(nrow(r),ncol(r),3))
   plot.new()
@@ -109,7 +105,6 @@ plot_rgb <- function(r, g, b, main_title, subtitle=NULL, border=TRUE) {
   if(!is.null(subtitle)) mtext(subtitle, 3, 0.5, line=0.5)
   if(border) box(lwd=2)
 }
-```
 
 
 ## 3b.Visualization of original and aligned bands
@@ -164,36 +159,32 @@ r0<-hv[1]; c0<-hv[2]; crop<-function(x) x[r0:(r0+299), c0:(c0+299)]
 ```
 
 ### 4.1 Red + Green (High-Variance)
-```{r visualize-high-variance, fig.width=10, fig.height=5}
 
 par(mfrow=c(1,2), mar=c(2,2,3,1))
 plot_rgb(crop(R_b), crop(G_b), 0, "Red + Green (High-Variance)", "Before Alignment (Misaligned)")
 plot_rgb(crop(R_a), crop(G_a), 0, "Red + Green (High-Variance)", "After Alignment (Coregistered)")
 par(mfrow=c(1,1))
-```
+
 
 ### 4.2 Red + NIR (High-Variance)
-```{r visualize-red-nir-high-variance, fig.width=10, fig.height=5}
+
 
 par(mfrow=c(1,2), mar=c(2,2,3,1))
 plot_rgb(crop(R_b), 0, crop(N_b), "Red + NIR (High-Variance)", "Before Alignment (Misaligned)")
 plot_rgb(crop(R_a), 0, crop(N_a), "Red + NIR (High-Variance)", "After Alignment (Coregistered)")
 par(mfrow=c(1,1))
-```
+
 
 ### 4.3 Red + Green + NIR (High-Variance)
-
-```{r visualize-rgb-high-variance, fig.width=10, fig.height=5}
 
 par(mfrow=c(1,2), mar=c(2,2,3,1))
 plot_rgb(crop(N_b), crop(R_b), crop(G_b), "Red + Green + NIR (High-Variance)", "Before Alignment (Misaligned)")
 plot_rgb(crop(N_a), crop(R_a), crop(G_a), "Red + Green + NIR (High-Variance)", "After Alignment (Coregistered)")
 par(mfrow=c(1,1))
-```
 
-```{r final-message, echo=FALSE}
+
 cat("✓ All figures with borders and captions generated successfully.\n")
-```
+
 
 
 
