@@ -6,7 +6,7 @@ Date: 2026-02-03
 
 This repository contains an R script for coregistering DJI multispectral images (Green, Red, NIR) using a shift-based alignment method, and visualizing the results for both full-frame images and high-variance regions.
 
-#  Repository Overview
+## Repository Overview
 
 The project demonstrates:
 
@@ -39,7 +39,7 @@ Providing clear comparisons to highlight misalignments and improvements.
 
   - Output/ – Folder where generated plots or exported images can be       stored.
 
-# Visualization Examples
+## Visualization 
 
 Full-frame composites:
 
