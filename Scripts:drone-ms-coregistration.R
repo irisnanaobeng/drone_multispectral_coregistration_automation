@@ -153,3 +153,4 @@ par(mfrow=c(1,1))
 
 cat("✓ All figures with borders and captions generated successfully.\n")
 
+
