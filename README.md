@@ -25,7 +25,7 @@ The project demonstrates:
 
 Providing clear comparisons to highlight misalignments and improvements.
 
-/drone-ms-coregistration
+drone-ms-coregistration
   - ├─ DJI_20251115110614_0003_MS_G (1).tiff
   - ├─ DJI_20251115110614_0003_MS_R.tiff
   - ├─ DJI_20251115110614_0003_MS_NIR.tiff
@@ -35,9 +35,9 @@ Providing clear comparisons to highlight misalignments and improvements.
   - ├─ Output/
   - └─ README.md
 
-  - Scripts/ – Contains the R script for coregistration and                visualization.
+  - Scripts/ – Contains the R script for coregistration and visualization.
 
-  - Output/ – Folder where generated plots or exported images can be       stored.
+  
 
 ## Visualization 
 
