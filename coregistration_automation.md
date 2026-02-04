@@ -1,21 +1,22 @@
-DJI Multispectral Coregistration & Visualization
+Drone Multispectral Coregistration & Visualization
 ================
 Iris Nana Obeng
-2026-02-03
-
-## 1. Loading DJI multispectral bands
-
-The dataset includes 3 bands: Green, Red, NIR. The RED band will be used
-as reference for alignment.
+2026-02-04
 
 ``` r
-# Load multispectral bands
+library(terra)
+
+setwd("~/Desktop/drone ms coregistration")
+```
+
+# 2. Load multispectral bands (Red = reference)
+
+``` r
 files <- c(
   "DJI_20251115110614_0003_MS_G (1).tiff",
   "DJI_20251115110614_0003_MS_R.tiff",
   "DJI_20251115110614_0003_MS_NIR.tiff"
 )
-band_names <- c("Green", "Red", "NIR")
 
 ms <- rast(files)
 ```
@@ -23,200 +24,140 @@ ms <- rast(files)
     ## Warning: [rast] unknown extent
 
 ``` r
-# Convert raster layers to matrices
-band_matrices <- lapply(1:nlyr(ms), function(i) {
-  as.matrix(ms[[i]], wide = TRUE)
-})
-names(band_matrices) <- band_names
+names(ms) <- c("Green", "Red", "NIR")
 ```
 
-## 2.Alignment function
-
-Defining functions to shift bands relative to the reference RED band,
-maximizing correlation.
+# 3. Alignment functions (matrix-based correlation)
 
 ``` r
-align_band_simple <- function(ref_mat, target_mat, max_shift=20) {
+align_band_simple <- function(ref_mat, target_mat, max_shift = 20) {
   best_cor <- -Inf; best_dx <- 0; best_dy <- 0
   rows <- nrow(ref_mat); cols <- ncol(ref_mat)
-  for(dx in -max_shift:max_shift) for(dy in -max_shift:max_shift) {
-    shifted <- matrix(NA, rows, cols)
-    r_dst <- (1:rows)+dy; c_dst <- (1:cols)+dx
-    ok_r <- r_dst >= 1 & r_dst <= rows; ok_c <- c_dst >= 1 & c_dst <= cols
-    shifted[r_dst[ok_r], c_dst[ok_c]] <- target_mat[(1:rows)[ok_r], (1:cols)[ok_c]]
-    overlap <- !is.na(ref_mat) & !is.na(shifted)
-    if(sum(overlap)>1000) {
-      cc <- cor(ref_mat[overlap], shifted[overlap], use="complete.obs")
-      if(!is.na(cc) && cc>best_cor) { best_cor <- cc; best_dx <- dx; best_dy <- dy }
+  
+  for (dx in -max_shift:max_shift) {
+    for (dy in -max_shift:max_shift) {
+      shifted <- matrix(NA, rows, cols)
+      r_dst <- (1:rows) + dy
+      c_dst <- (1:cols) + dx
+      ok_r <- r_dst >= 1 & r_dst <= rows
+      ok_c <- c_dst >= 1 & c_dst <= cols
+      shifted[r_dst[ok_r], c_dst[ok_c]] <-
+        target_mat[(1:rows)[ok_r], (1:cols)[ok_c]]
+      
+      overlap <- !is.na(ref_mat) & !is.na(shifted)
+      if (sum(overlap) > 1000) {
+        cc <- cor(ref_mat[overlap], shifted[overlap], use = "complete.obs")
+        if (!is.na(cc) && cc > best_cor) {
+          best_cor <- cc; best_dx <- dx; best_dy <- dy
+        }
+      }
     }
   }
-  list(dx=best_dx, dy=best_dy, cor=best_cor)
+  list(dx = best_dx, dy = best_dy, cor = best_cor)
 }
+```
 
+``` r
 apply_shift <- function(mat, dx, dy) {
-  rows <- nrow(mat); cols <- ncol(mat); shifted <- matrix(NA, rows, cols)
-  r_dst <- (1:rows)+dy; c_dst <- (1:cols)+dx
-  ok_r <- r_dst >=1 & r_dst<=rows; ok_c <- c_dst>=1 & c_dst<=cols
-  shifted[r_dst[ok_r], c_dst[ok_c]] <- mat[(1:rows)[ok_r], (1:cols)[ok_c]]
+  rows <- nrow(mat); cols <- ncol(mat)
+  shifted <- matrix(NA, rows, cols)
+  r_dst <- (1:rows) + dy
+  c_dst <- (1:cols) + dx
+  ok_r <- r_dst >= 1 & r_dst <= rows
+  ok_c <- c_dst >= 1 & c_dst <= cols
+  shifted[r_dst[ok_r], c_dst[ok_c]] <-
+    mat[(1:rows)[ok_r], (1:cols)[ok_c]]
   shifted
 }
 ```
 
-## 2.1 Aligning Green and NIR bands to Red band (reference)
-
 ``` r
-ref_red <- band_matrices$Red
-aligned_matrices <- list(Red=ref_red)
-for(b in c("Green","NIR")) {
-  res <- align_band_simple(ref_red, band_matrices[[b]])
-  aligned_matrices[[b]] <- apply_shift(band_matrices[[b]], res$dx, res$dy)
+# ---------------------------------------------------------
+# 4. Align Green and NIR to Red
+# ---------------------------------------------------------
+ref_red_mat <- as.matrix(ms$Red, wide = TRUE)
+aligned_rasters <- list(Red = ms$Red)
+
+for (b in c("Green", "NIR")) {
+  target_mat <- as.matrix(ms[[b]], wide = TRUE)
+  res <- align_band_simple(ref_red_mat, target_mat)
+  shifted_mat <- apply_shift(target_mat, res$dx, res$dy)
+  
+  r_aligned <- rast(shifted_mat)
+  ext(r_aligned) <- ext(ms$Red)
+  crs(r_aligned) <- crs(ms$Red)
+  
+  aligned_rasters[[b]] <- r_aligned
+  
+  cat(sprintf("✓ %s aligned (dx=%d, dy=%d, cor=%.3f)\n",
+              b, res$dx, res$dy, res$cor))
 }
 ```
 
-## 2.2 Normalize and replace NA
+    ## ✓ Green aligned (dx=20, dy=15, cor=0.457)
+    ## ✓ NIR aligned (dx=-16, dy=-20, cor=-0.024)
 
-Normalize values to \[0,1\] for plotting and replace NA values.
-
-``` r
-normalize <- function(x){ r<-range(x,na.rm=TRUE); (x-r[1])/(r[2]-r[1]) }
-replace_na <- function(x){ x[is.na(x)]<-0; x }
-
-R_b <- replace_na(normalize(band_matrices$Red))
-G_b <- replace_na(normalize(band_matrices$Green))
-N_b <- replace_na(normalize(band_matrices$NIR))
-
-R_a <- replace_na(normalize(aligned_matrices$Red))
-G_a <- replace_na(normalize(aligned_matrices$Green))
-N_a <- replace_na(normalize(aligned_matrices$NIR))
-```
-
-## 3a. Plotting Helper Function (with Border & Caption)
+# 5. RGB stacks for plotting
 
 ``` r
-plot_rgb <- function(r, g, b, main_title, subtitle=NULL, border=TRUE) {
-  arr <- array(c(r,g,b), dim=c(nrow(r),ncol(r),3))
-  plot.new()
-  rasterImage(arr,0,0,1,1)
-  title(main_title, line=1.5)
-  if(!is.null(subtitle)) mtext(subtitle, 3, 0.5, line=0.5)
-  if(border) box(lwd=2)
-}
+# Red + Green
+rg_before <- c(ms$Red, ms$Green, ms$Green)
+rg_after  <- c(aligned_rasters$Red, aligned_rasters$Green, aligned_rasters$Green)
+
+# Red + NIR
+rn_before <- c(ms$Red, ms$NIR, ms$NIR)
+rn_after  <- c(aligned_rasters$Red, aligned_rasters$NIR, aligned_rasters$NIR)
+
+# Red + Green + NIR
+rgb_before <- c(ms$Red, ms$Green, ms$NIR)
+rgb_after  <- c(aligned_rasters$Red, aligned_rasters$Green, aligned_rasters$NIR)
 ```
 
-## 3b.Visualization of original and aligned bands
-
-### 3.1 Red + Green composite before and after alignment
+# 6. Plotting
 
 ``` r
-par(mfrow=c(1,2), mar=c(2,2,4,1))
-
-par(mfrow=c(1,2), mar=c(2,2,3,1))
-plot_rgb(R_b, G_b, 0, "Red + Green", "Before Alignment (Misaligned)")
-plot_rgb(R_a, G_a, 0, "Red + Green", "After Alignment (Coregistered)")
+# Red + Green
+par(mfrow = c(1,2), mar = c(2,2,3,1))
+plotRGB(rg_before, r=1, g=2, b=3, stretch="lin",
+        main="Red + Green\nBefore Alignment")
+plotRGB(rg_after,  r=1, g=2, b=3, stretch="lin",
+        main="Red + Green\nAfter Alignment")
 ```
 
-![](coregistration_automation_files/figure-gfm/visualize-bands-1.png)<!-- -->
+![](coregistration_automation_files/figure-gfm/unnamed-chunk-6-1.png)<!-- -->
 
 ``` r
-par(mfrow=c(1,1))
+par(mfrow = c(1,1))
+
+# Red + NIR
+par(mfrow = c(1,2), mar = c(2,2,3,1))
+plotRGB(rn_before, r=1, g=2, b=3, stretch="lin",
+        main="Red + NIR\nBefore Alignment")
+plotRGB(rn_after,  r=1, g=2, b=3, stretch="lin",
+        main="Red + NIR\nAfter Alignment")
 ```
 
-### 3.2 Red + NIR composite before and after alignment
+![](coregistration_automation_files/figure-gfm/unnamed-chunk-6-2.png)<!-- -->
 
 ``` r
-par(mfrow=c(1,2), mar=c(2,2,3,1))
-plot_rgb(R_b, 0, N_b, "Red + NIR", "Before Alignment (Misaligned)")
-plot_rgb(R_a, 0, N_a, "Red + NIR", "After Alignment (Coregistered)")
+par(mfrow = c(1,1))
+
+# Red + Green + NIR
+par(mfrow = c(1,2), mar = c(2,2,3,1))
+plotRGB(rgb_before, r=1, g=2, b=3, stretch="lin",
+        main="Red + Green + NIR\nBefore Alignment")
+plotRGB(rgb_after,  r=1, g=2, b=3, stretch="lin",
+        main="Red + Green + NIR\nAfter Alignment")
 ```
 
-![](coregistration_automation_files/figure-gfm/visualize-red-nir-1.png)<!-- -->
+![](coregistration_automation_files/figure-gfm/unnamed-chunk-6-3.png)<!-- -->
 
 ``` r
-par(mfrow=c(1,1))
+par(mfrow = c(1,1))
 ```
-
-### 3.3 Red + Green + NIR composite before and after alignment
 
 ``` r
-par(mfrow=c(1,2), mar=c(2,2,3,1))
-plot_rgb(N_b, R_b, G_b, "Red + Green + NIR", "Before Alignment (Misaligned)")
-plot_rgb(N_a, R_a, G_a, "Red + Green + NIR", "After Alignment (Coregistered)")
+cat("✓ Coregistration and all classic RGB combinations plotted successfully.\n")
 ```
 
-![](coregistration_automation_files/figure-gfm/visualize-rgb-1.png)<!-- -->
-
-``` r
-par(mfrow=c(1,1))
-```
-
-## 4. High-Variance Region
-
-Cropping a 300×300 patch with the highest variance to highlight
-misalignment more clearly.
-
-``` r
-high_variance_patch <- function(mat, size=300, step=50){
-  rows<-nrow(mat); cols<-ncol(mat)
-  best_var <- -Inf; best_rc <- c(1,1)
-  for(r in seq(1, rows-size, by=step)) for(c in seq(1, cols-size, by=step)) {
-    v <- var(as.vector(mat[r:(r+size-1), c:(c+size-1)]), na.rm=TRUE)
-    if(!is.na(v) && v>best_var){ best_var<-v; best_rc<-c(r,c) }
-  }
-  best_rc
-}
-
-hv <- high_variance_patch(R_b)
-r0<-hv[1]; c0<-hv[2]; crop<-function(x) x[r0:(r0+299), c0:(c0+299)]
-```
-
-### 4.1 Red + Green (High-Variance)
-
-``` r
-par(mfrow=c(1,2), mar=c(2,2,3,1))
-plot_rgb(crop(R_b), crop(G_b), 0, "Red + Green (High-Variance)", "Before Alignment (Misaligned)")
-plot_rgb(crop(R_a), crop(G_a), 0, "Red + Green (High-Variance)", "After Alignment (Coregistered)")
-```
-
-![](coregistration_automation_files/figure-gfm/visualize-high-variance-1.png)<!-- -->
-
-``` r
-par(mfrow=c(1,1))
-```
-
-### 4.2 Red + NIR (High-Variance)
-
-``` r
-par(mfrow=c(1,2), mar=c(2,2,3,1))
-plot_rgb(crop(R_b), 0, crop(N_b), "Red + NIR (High-Variance)", "Before Alignment (Misaligned)")
-plot_rgb(crop(R_a), 0, crop(N_a), "Red + NIR (High-Variance)", "After Alignment (Coregistered)")
-```
-
-![](coregistration_automation_files/figure-gfm/visualize-red-nir-high-variance-1.png)<!-- -->
-
-``` r
-par(mfrow=c(1,1))
-```
-
-### 4.3 Red + Green + NIR (High-Variance)
-
-``` r
-par(mfrow=c(1,2), mar=c(2,2,3,1))
-plot_rgb(crop(N_b), crop(R_b), crop(G_b), "Red + Green + NIR (High-Variance)", "Before Alignment (Misaligned)")
-plot_rgb(crop(N_a), crop(R_a), crop(G_a), "Red + Green + NIR (High-Variance)", "After Alignment (Coregistered)")
-```
-
-![](coregistration_automation_files/figure-gfm/visualize-rgb-high-variance-1.png)<!-- -->
-
-``` r
-par(mfrow=c(1,1))
-```
-
-    ## ✓ All figures with borders and captions generated successfully.
-
-## 5. Summary
-
-This analysis demonstrates the coregistration of DJI multispectral bands
-(Green, Red, NIR) using a simple shift-based method to maximize
-correlation with the reference Red band. The visualizations before and
-after alignment clearly show improved spatial correspondence, especially
-in high-variance regions, confirming successful coregistration.
+    ## ✓ Coregistration and all classic RGB combinations plotted successfully.
