@@ -71,10 +71,9 @@ apply_shift <- function(mat, dx, dy) {
 }
 ```
 
-``` r
-# ---------------------------------------------------------
 # 4. Align Green and NIR to Red
-# ---------------------------------------------------------
+
+``` r
 ref_red_mat <- as.matrix(ms$Red, wide = TRUE)
 aligned_rasters <- list(Red = ms$Red)
 
@@ -108,9 +107,9 @@ rg_after  <- c(aligned_rasters$Red, aligned_rasters$Green, aligned_rasters$Green
 rn_before <- c(ms$Red, ms$NIR, ms$NIR)
 rn_after  <- c(aligned_rasters$Red, aligned_rasters$NIR, aligned_rasters$NIR)
 
-# Red + Green + NIR
-rgb_before <- c(ms$Red, ms$Green, ms$NIR)
-rgb_after  <- c(aligned_rasters$Red, aligned_rasters$Green, aligned_rasters$NIR)
+# Green + Red + NIR
+rgb_before <- c(ms$Green, ms$Red, ms$NIR)
+rgb_after  <- c(aligned_rasters$Green, aligned_rasters$Red, aligned_rasters$NIR)
 ```
 
 # 6. Plotting
@@ -120,11 +119,11 @@ rgb_after  <- c(aligned_rasters$Red, aligned_rasters$Green, aligned_rasters$NIR)
 par(mfrow = c(1,2), mar = c(2,2,3,1))
 plotRGB(rg_before, r=1, g=2, b=3, stretch="lin",
         main="Red + Green\nBefore Alignment")
-plotRGB(rg_after,  r=1, g=2, b=3, stretch="lin",
+plotRGB(rg_after, r=1, g=2, b=3, stretch="lin",
         main="Red + Green\nAfter Alignment")
 ```
 
-![](coregistration_automation_files/figure-gfm/unnamed-chunk-6-1.png)<!-- -->
+<img src="coregistration_automation_files/figure-gfm/plotting-1.png" style="display: block; margin: auto;" />
 
 ``` r
 par(mfrow = c(1,1))
@@ -133,24 +132,24 @@ par(mfrow = c(1,1))
 par(mfrow = c(1,2), mar = c(2,2,3,1))
 plotRGB(rn_before, r=1, g=2, b=3, stretch="lin",
         main="Red + NIR\nBefore Alignment")
-plotRGB(rn_after,  r=1, g=2, b=3, stretch="lin",
+plotRGB(rn_after, r=1, g=2, b=3, stretch="lin",
         main="Red + NIR\nAfter Alignment")
 ```
 
-![](coregistration_automation_files/figure-gfm/unnamed-chunk-6-2.png)<!-- -->
+<img src="coregistration_automation_files/figure-gfm/plotting-2.png" style="display: block; margin: auto;" />
 
 ``` r
 par(mfrow = c(1,1))
 
-# Red + Green + NIR
+# Green + Red + NIR
 par(mfrow = c(1,2), mar = c(2,2,3,1))
-plotRGB(rgb_before, r=1, g=2, b=3, stretch="lin",
-        main="Red + Green + NIR\nBefore Alignment")
-plotRGB(rgb_after,  r=1, g=2, b=3, stretch="lin",
-        main="Red + Green + NIR\nAfter Alignment")
+plotRGB(rgb_before, r=3, g=2, b=1, stretch="lin",
+        main="Green + Red + NIR\nBefore Alignment")
+plotRGB(rgb_after, r=3, g=2, b=1, stretch="lin",
+        main="Green + Red + NIR\nAfter Alignment")
 ```
 
-![](coregistration_automation_files/figure-gfm/unnamed-chunk-6-3.png)<!-- -->
+<img src="coregistration_automation_files/figure-gfm/plotting-3.png" style="display: block; margin: auto;" />
 
 ``` r
 par(mfrow = c(1,1))
