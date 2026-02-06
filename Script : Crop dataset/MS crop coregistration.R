@@ -1,9 +1,8 @@
-# ---
 # title: "Drone Multispectral Coregistration (Crop Dataset)"
 # author: "Iris Nana Obeng"
+# Data used: Crop multispectral TIFFs (Red, Green, NIR) provided by Prof. Duccio Rocchini 
 # date: "2026-02-04"
-# output: github_document
-# ---
+
 
 # Setup
 library(terra)
