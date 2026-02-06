@@ -1,0 +1,145 @@
+---
+title: "Drone Multispectral Coregistration (Crop Dataset)"
+author: "Iris Nana Obeng"
+date: "2026-02-04"
+output: github_document
+---
+
+```{r setup, message=FALSE, warning=FALSE}
+library(terra)
+setwd("~/Desktop/drone ms coregistration")
+```
+
+## Load multispectral bands (Red = reference)
+
+```{r load-images}
+# Load the multispectral images (assuming they are in GeoTIFF format)
+files <- c(
+  "ms_crop_gre.tif",
+  "ms_crop_red.tif",
+  "ms_crop_nir.tif"
+)
+
+ms <- rast(files)
+names(ms) <- c("Green", "Red", "NIR")
+```
+
+## Alignment functions (matrix-based correlation)
+
+```{r}
+align_band_simple <- function(ref_mat, target_mat, max_shift = 20) {
+  best_cor <- -Inf; best_dx <- 0; best_dy <- 0
+  rows <- nrow(ref_mat); cols <- ncol(ref_mat)
+  
+  for (dx in -max_shift:max_shift) {
+    for (dy in -max_shift:max_shift) {
+      shifted <- matrix(NA, rows, cols)
+      r_dst <- (1:rows) + dy
+      c_dst <- (1:cols) + dx
+      ok_r <- r_dst >= 1 & r_dst <= rows
+      ok_c <- c_dst >= 1 & c_dst <= cols
+      shifted[r_dst[ok_r], c_dst[ok_c]] <-
+        target_mat[(1:rows)[ok_r], (1:cols)[ok_c]]
+      
+      overlap <- !is.na(ref_mat) & !is.na(shifted)
+      if (sum(overlap) > 1000) {
+        cc <- cor(ref_mat[overlap], shifted[overlap], use = "complete.obs")
+        if (!is.na(cc) && cc > best_cor) {
+          best_cor <- cc; best_dx <- dx; best_dy <- dy
+        }
+      }
+    }
+  }
+  list(dx = best_dx, dy = best_dy, cor = best_cor)
+}
+
+apply_shift <- function(mat, dx, dy) {
+  rows <- nrow(mat); cols <- ncol(mat)
+  shifted <- matrix(NA, rows, cols)
+  r_dst <- (1:rows) + dy
+  c_dst <- (1:cols) + dx
+  ok_r <- r_dst >= 1 & r_dst <= rows
+  ok_c <- c_dst >= 1 & c_dst <= cols
+  shifted[r_dst[ok_r], c_dst[ok_c]] <-
+    mat[(1:rows)[ok_r], (1:cols)[ok_c]]
+  shifted
+}
+```
+
+## Aligning Green and NIR to Red
+
+```{r coregister-bands}
+
+ref_red_mat <- as.matrix(ms$Red, wide = TRUE)
+aligned_rasters <- list(Red = ms$Red)
+
+for (b in c("Green", "NIR")) {
+  target_mat <- as.matrix(ms[[b]], wide = TRUE)
+  res <- align_band_simple(ref_red_mat, target_mat)
+  shifted_mat <- apply_shift(target_mat, res$dx, res$dy)
+  
+  r_aligned <- rast(shifted_mat)
+  ext(r_aligned) <- ext(ms$Red)
+  crs(r_aligned) <- crs(ms$Red)
+  
+  aligned_rasters[[b]] <- r_aligned
+  
+  cat(sprintf("✓ %s aligned (dx=%d, dy=%d, cor=%.3f)\n",
+              b, res$dx, res$dy, res$cor))
+}
+```
+
+## 5. RGB stacks for plotting
+
+```{r create-rgb-stacks}
+# Red + Green
+rg_before <- c(ms$Red, ms$Green, ms$Green)
+rg_after  <- c(aligned_rasters$Red,
+               aligned_rasters$Green,
+               aligned_rasters$Green)
+
+# Red + NIR
+rn_before <- c(ms$Red, ms$NIR, ms$NIR)
+rn_after  <- c(aligned_rasters$Red,
+               aligned_rasters$NIR,
+               aligned_rasters$NIR)
+
+# Green + Red + NIR (recommended RGB)
+rgb_before <- c(ms$Green, ms$Red, ms$NIR)
+rgb_after  <- c(aligned_rasters$Green,
+                aligned_rasters$Red,
+                aligned_rasters$NIR)
+```
+
+## Plotting results
+
+```{r plot-results, fig.width=10, fig.height=8}
+
+# Red–Green composite
+
+par(mfrow = c(1,2), mar = c(2,2,3,1))
+plotRGB(rg_before, r=1, g=2, b=3, stretch="lin",
+        main="Red + Green\nBefore Alignment")
+plotRGB(rg_after, r=1, g=2, b=3, stretch="lin",
+        main="Red + Green\nAfter Alignment")
+
+# Red–NIR composite
+par(mfrow = c(1,2), mar = c(2,2,3,1))
+plotRGB(rn_before, r=1, g=2, b=3, stretch="lin",
+        main="Red + NIR\nBefore Alignment")
+plotRGB(rn_after, r=1, g=2, b=3, stretch="lin",
+        main="Red + NIR\nAfter Alignment")
+
+# Green–Red–NIR composite 
+par(mfrow = c(1,2), mar = c(2,2,3,1))
+plotRGB(rgb_before, r=1, g=2, b=3, stretch="lin",
+        main="Green + Red + NIR\nBefore Alignment")
+plotRGB(rgb_after, r=1, g=2, b=3, stretch="lin",
+        main="Green + Red + NIR\nAfter Alignment")
+
+par(mfrow = c(1,1))
+```
+
+```{r}
+cat("✓ Crop dataset coregistration and RGB visualizations completed successfully.\n")
+```
