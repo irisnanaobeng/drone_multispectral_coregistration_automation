@@ -1,13 +1,12 @@
----
-title: "Drone Multispectral Coregistration (Crop Dataset)"
-author: "Iris Nana Obeng"
-date: "2026-02-04"
-output: github_document
----
-  
+# ---
+# title: "Drone Multispectral Coregistration (Crop Dataset)"
+# author: "Iris Nana Obeng"
+# date: "2026-02-04"
+# output: github_document
+# ---
 
+# Setup
 library(terra)
-
 setwd("~/Desktop/drone ms coregistration")
 
 # Load multispectral bands (Red = reference)
@@ -21,10 +20,12 @@ ms <- rast(files)
 names(ms) <- c("Green", "Red", "NIR")
 
 # Alignment functions (matrix-based correlation)
-
 align_band_simple <- function(ref_mat, target_mat, max_shift = 20) {
-  best_cor <- -Inf; best_dx <- 0; best_dy <- 0
-  rows <- nrow(ref_mat); cols <- ncol(ref_mat)
+  best_cor <- -Inf
+  best_dx <- 0
+  best_dy <- 0
+  rows <- nrow(ref_mat)
+  cols <- ncol(ref_mat)
   
   for (dx in -max_shift:max_shift) {
     for (dy in -max_shift:max_shift) {
@@ -33,7 +34,6 @@ align_band_simple <- function(ref_mat, target_mat, max_shift = 20) {
       c_dst <- (1:cols) + dx
       ok_r <- r_dst >= 1 & r_dst <= rows
       ok_c <- c_dst >= 1 & c_dst <= cols
-      
       shifted[r_dst[ok_r], c_dst[ok_c]] <-
         target_mat[(1:rows)[ok_r], (1:cols)[ok_c]]
       
@@ -52,20 +52,19 @@ align_band_simple <- function(ref_mat, target_mat, max_shift = 20) {
 }
 
 apply_shift <- function(mat, dx, dy) {
-  rows <- nrow(mat); cols <- ncol(mat)
+  rows <- nrow(mat)
+  cols <- ncol(mat)
   shifted <- matrix(NA, rows, cols)
-  
   r_dst <- (1:rows) + dy
   c_dst <- (1:cols) + dx
   ok_r <- r_dst >= 1 & r_dst <= rows
   ok_c <- c_dst >= 1 & c_dst <= cols
-  
   shifted[r_dst[ok_r], c_dst[ok_c]] <-
     mat[(1:rows)[ok_r], (1:cols)[ok_c]]
-  
   shifted
 }
 
+# Aligning Green and NIR to Red
 ref_red_mat <- as.matrix(ms$Red, wide = TRUE)
 aligned_rasters <- list(Red = ms$Red)
 
@@ -84,6 +83,7 @@ for (b in c("Green", "NIR")) {
               b, res$dx, res$dy, res$cor))
 }
 
+# 5. RGB stacks for plotting
 # Red + Green
 rg_before <- c(ms$Red, ms$Green, ms$Green)
 rg_after  <- c(aligned_rasters$Red,
@@ -102,13 +102,8 @@ rgb_after  <- c(aligned_rasters$Green,
                 aligned_rasters$Red,
                 aligned_rasters$NIR)
 
+# Plotting results
 # Red–Green composite
-
-
-## Visualization
-
-# Red–Green composite
-
 par(mfrow = c(1,2), mar = c(2,2,3,1))
 plotRGB(rg_before, r=1, g=2, b=3, stretch="lin",
         main="Red + Green\nBefore Alignment")
@@ -131,7 +126,4 @@ plotRGB(rgb_after, r=1, g=2, b=3, stretch="lin",
 
 par(mfrow = c(1,1))
 
-
-cat("*Figure: Multispectral RGB composite before and after coregistration.*")
-
-
+cat("✓ Crop dataset coregistration and RGB visualizations completed successfully.\n")
