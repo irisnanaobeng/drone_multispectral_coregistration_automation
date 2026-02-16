@@ -5,6 +5,7 @@ Iris Nana Obeng
 
 ``` r
 library(terra)
+library(imager)
 setwd("~/Desktop/drone ms coregistration")
 ```
 
@@ -71,23 +72,33 @@ apply_shift <- function(mat, dx, dy) {
 ref_red_mat <- as.matrix(ms$Red, wide = TRUE)
 aligned_rasters <- list(Red = ms$Red)
 
-for (b in c("Green", "NIR")) {
-  target_mat <- as.matrix(ms[[b]], wide = TRUE)
-  res <- align_band_simple(ref_red_mat, target_mat)
-  shifted_mat <- apply_shift(target_mat, res$dx, res$dy)
-  
-  r_aligned <- rast(shifted_mat)
-  ext(r_aligned) <- ext(ms$Red)
-  crs(r_aligned) <- crs(ms$Red)
-  
-  aligned_rasters[[b]] <- r_aligned
-  
-  cat(sprintf("✓ %s aligned (dx=%d, dy=%d, cor=%.3f)\n",
-              b, res$dx, res$dy, res$cor))
-}
+# --- Align Green using correlation ---
+target_green <- as.matrix(ms$Green, wide = TRUE)
+res_green <- align_band_simple(ref_red_mat, target_green)
+shifted_green <- apply_shift(target_green, res_green$dx, res_green$dy)
+r_aligned_green <- rast(shifted_green)
+ext(r_aligned_green) <- ext(ms$Red)
+crs(r_aligned_green) <- crs(ms$Red)
+aligned_rasters$Green <- r_aligned_green
+cat(sprintf("✓ Green aligned (dx=%d, dy=%d, cor=%.3f)\n",
+            res_green$dx, res_green$dy, res_green$cor))
 ```
 
     ## ✓ Green aligned (dx=20, dy=-15, cor=0.877)
+
+``` r
+# --- Align NIR using the same correlation method ---
+target_nir <- as.matrix(ms$NIR, wide = TRUE)
+res_nir <- align_band_simple(ref_red_mat, target_nir)
+shifted_nir <- apply_shift(target_nir, res_nir$dx, res_nir$dy)
+r_aligned_nir <- rast(shifted_nir)
+ext(r_aligned_nir) <- ext(ms$Red)
+crs(r_aligned_nir) <- crs(ms$Red)
+aligned_rasters$NIR <- r_aligned_nir
+cat(sprintf("✓ NIR aligned (dx=%d, dy=%d, cor=%.3f)\n",
+            res_nir$dx, res_nir$dy, res_nir$cor))
+```
+
     ## ✓ NIR aligned (dx=-20, dy=20, cor=0.412)
 
 ## 5. RGB stacks for plotting
