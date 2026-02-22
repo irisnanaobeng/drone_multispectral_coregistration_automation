@@ -1,11 +1,14 @@
 Drone Multispectral Coregistration (Crop Dataset) - Complete Fusion
 ================
 Iris Nana Obeng
-2026-02-04
+2026-02-21
 
 ``` r
 library(terra)
 library(imager)
+
+knitr::opts_chunk$set(dev = "png")
+
 setwd("~/Desktop/drone ms coregistration")
 ```
 
@@ -17,7 +20,7 @@ ms <- rast(files)
 names(ms) <- c("Green", "Red", "NIR")
 ```
 
-## Shift Functions
+## Alignment Functions
 
 ``` r
 align_band_simple <- function(ref_mat, target_mat, max_shift = 20) {
@@ -85,14 +88,11 @@ get_edges <- function(img){
   edges <- sqrt(sobx^2 + soby^2)
   edges <- edges / max(edges)
 
-  edges[edges < 0.2] <- 0
-  edges[edges >= 0.2] <- 1
-
   t(as.matrix(edges))
 }
 ```
 
-## Edge-based Alignment
+## Edge-based Alignment (For NIR)
 
 ``` r
 align_band_edges <- function(ref_rast, target_rast, max_shift = 30){
@@ -130,6 +130,20 @@ align_band_edges <- function(ref_rast, target_rast, max_shift = 30){
 }
 ```
 
+## Prepare matrices
+
+``` r
+ref_red <- ms$Red
+green   <- ms$Green
+nir     <- ms$NIR
+
+ref_red_mat <- as.matrix(ref_red, wide=TRUE)
+green_mat   <- as.matrix(green, wide=TRUE)
+nir_mat     <- as.matrix(nir, wide=TRUE)
+
+aligned_rasters <- list(Red = ref_red)
+```
+
 ## Coregister Bands
 
 ``` r
@@ -141,7 +155,7 @@ ref_red_mat <- as.matrix(ref_red, wide=TRUE)
 green_mat   <- as.matrix(green, wide=TRUE)
 nir_mat     <- as.matrix(nir, wide=TRUE)
 
-# Green alignment
+# --- GREEN ALIGNMENT ---
 res_green <- align_band_simple(ref_red_mat, green_mat)
 
 green_aligned <- apply_shift(green_mat,
@@ -152,6 +166,8 @@ green_r <- rast(green_aligned)
 ext(green_r) <- ext(ref_red)
 crs(green_r) <- crs(ref_red)
 
+aligned_rasters$Green <- green_r
+
 cat(sprintf("✓ Green aligned (dx=%d, dy=%d, cor=%.3f)\n",
             res_green$dx, res_green$dy, res_green$cor))
 ```
@@ -159,7 +175,7 @@ cat(sprintf("✓ Green aligned (dx=%d, dy=%d, cor=%.3f)\n",
     ## ✓ Green aligned (dx=20, dy=-15, cor=0.877)
 
 ``` r
-# NIR alignment
+# --- NIR ALIGNMENT ---
 res_nir <- align_band_edges(ref_red, nir)
 
 nir_spatial <- apply_shift(nir_mat,
@@ -174,9 +190,9 @@ cat(sprintf("✓ NIR aligned (dx=%d, dy=%d, edge-cor=%.3f)\n",
             res_nir$dx, res_nir$dy, res_nir$cor))
 ```
 
-    ## ✓ NIR aligned (dx=-28, dy=30, edge-cor=0.029)
+    ## ✓ NIR aligned (dx=-30, dy=30, edge-cor=0.057)
 
-## Sub-pixel Refinement (Knit-Safe)
+## Sub-pixel Refinement
 
 ``` r
 cat("\n--- Refining to 0.1 pixel accuracy ---\n")
@@ -190,19 +206,19 @@ ref_mat <- as.matrix(ref_red, wide=TRUE)
 nir_mat <- as.matrix(nir_spatial_r, wide=TRUE)
 
 best_cor <- res_nir$cor
-best_dx_sub <- 0
-best_dy_sub <- 0
-# --- micro refinement around best shift ---
+best_dx_sub <- res_nir$dx
+best_dy_sub <- res_nir$dy
+
 for (dx in seq(best_dx_sub-0.3, best_dx_sub+0.3, by=0.05)) {
   for (dy in seq(best_dy_sub-0.3, best_dy_sub+0.3, by=0.05)) {
-
+    
     nir_shifted <- imshift(as.cimg(t(nir_mat)), dx, dy)
     nir_shifted <- t(as.matrix(nir_shifted))
-
+    
     overlap <- !is.na(ref_mat) & !is.na(nir_shifted)
     if (sum(overlap) > 1000) {
       cc <- cor(ref_mat[overlap], nir_shifted[overlap])
-
+      
       if (!is.na(cc) && cc > best_cor) {
         best_cor <- cc
         best_dx_sub <- dx
@@ -212,45 +228,40 @@ for (dx in seq(best_dx_sub-0.3, best_dx_sub+0.3, by=0.05)) {
   }
 }
 
+nir_final <- imshift(as.cimg(t(nir_mat)),
+                     best_dx_sub,
+                     best_dy_sub)
 
-if (abs(best_dx_sub) > 0.05 || abs(best_dy_sub) > 0.05) {
+nir_final <- t(as.matrix(nir_final))
+nir_r <- rast(nir_final)
 
-  cat(sprintf("✓ Subpixel refinement: dx=%.2f dy=%.2f cor=%.3f\n",
-              best_dx_sub, best_dy_sub, best_cor))
-
-  nir_final <- imshift(as.cimg(t(nir_mat)),
-                       best_dx_sub,
-                       best_dy_sub)
-
-  nir_final <- t(as.matrix(nir_final))
-  nir_r <- rast(nir_final)
-
-} else {
-
-  cat("No subpixel improvement found\n")
-  nir_r <- nir_spatial_r
-}
-```
-
-    ## ✓ Subpixel refinement: dx=-0.30 dy=-0.30 cor=0.505
-
-``` r
 ext(nir_r) <- ext(ref_red)
 crs(nir_r) <- crs(ref_red)
+
+aligned_rasters$NIR <- nir_r
+
+cat(sprintf("✓ NIR refined (dx=%.2f, dy=%.2f, cor=%.3f)\n",
+            best_dx_sub, best_dy_sub, best_cor))
 ```
 
-## RGB Visualization
+    ## ✓ NIR refined (dx=-29.95, dy=29.40, cor=0.658)
+
+## RGB STACKS FOR PLOTTING
 
 ``` r
 rg_before <- c(ms$Red, ms$Green, ms$Green)
-rg_after  <- c(ref_red, green_r, green_r)
+rg_after  <- c(ref_red, green_r, green_r) 
 
 rn_before <- c(ms$Red, ms$NIR, ms$NIR)
-rn_after  <- c(ref_red, nir_r, nir_r)
+rn_after  <- c(ref_red, nir_r, nir_r)      
 
 rgb_before <- c(ms$Green, ms$Red, ms$NIR)
-rgb_after  <- c(green_r, ref_red, nir_r)
+rgb_after  <- c(green_r, ref_red, nir_r)   
+
+cat("✓ RGB stacks prepared\n")
 ```
+
+    ## ✓ RGB stacks prepared
 
 ## Red + Green
 
