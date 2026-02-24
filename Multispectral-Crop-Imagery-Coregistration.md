@@ -1,4 +1,4 @@
-Drone Multispectral Coregistration (Crop Dataset) - Complete Fusion
+Drone Multispectral Coregistration (Crop Dataset)
 ================
 Iris Nana Obeng
 2026-02-21
@@ -6,8 +6,6 @@ Iris Nana Obeng
 ``` r
 library(terra)
 library(imager)
-
-knitr::opts_chunk$set(dev = "png")
 
 setwd("~/Desktop/drone ms coregistration")
 ```
@@ -155,7 +153,7 @@ ref_red_mat <- as.matrix(ref_red, wide=TRUE)
 green_mat   <- as.matrix(green, wide=TRUE)
 nir_mat     <- as.matrix(nir, wide=TRUE)
 
-# --- GREEN ALIGNMENT ---
+# Green Alignment
 res_green <- align_band_simple(ref_red_mat, green_mat)
 
 green_aligned <- apply_shift(green_mat,
@@ -175,7 +173,7 @@ cat(sprintf("✓ Green aligned (dx=%d, dy=%d, cor=%.3f)\n",
     ## ✓ Green aligned (dx=20, dy=-15, cor=0.877)
 
 ``` r
-# --- NIR ALIGNMENT ---
+# NIR Alignment
 res_nir <- align_band_edges(ref_red, nir)
 
 nir_spatial <- apply_shift(nir_mat,
