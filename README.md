@@ -1,62 +1,97 @@
-# Drone Multispectral Coregistration & Visualization
+# Drone Multispectral Coregistration (Crop Dataset)
 
-Author: Iris Nana Obeng
-Date: 2026-02-03
+## Overview
+
+This project implements a complete automatic band coregistration workflow for drone-based multispectral imagery using R.
+
+The goal is to spatially align:
+
+- Green band  
+- Red band (reference)  
+- Near-Infrared (NIR) band  
+
+into a geometrically consistent stack suitable for band fusion and vegetation analysis.
+
+The Red band is used as the spatial reference, while the Green and NIR bands are aligned to it.
 
 
-This repository contains an R script for coregistering DJI multispectral images (Green, Red, NIR) using a shift-based alignment method, and visualizing the results for both full-frame images and high-variance regions.
+## Methodology
 
-## Repository Overview
+### 1. Data Loading
 
-The project demonstrates:
+Multispectral GeoTIFF files are loaded using the `terra` package:
 
- - Loading DJI multispectral bands into R (terra package).
+- `ms_crop_gre.tif`
+- `ms_crop_red.tif`
+- `ms_crop_nir.tif`
 
- - Aligning Green and NIR bands to the Red band (used as reference)       using correlation-maximizing shifts.
+These are stacked into a multi-layer raster object for processing.
 
- - Normalizing raster values and replacing missing pixels (NA).
 
- - Visualizing before and after coregistration for:
+### 2. Green Band Alignment (Integer Pixel Shift)
 
-      Red + Green
-      Red + NIR
-      Red + Green + NIR
-      High-variance regions (300×300 pixels)
+The Green band is aligned to the Red band using:
 
-Providing clear comparisons to highlight misalignments and improvements.
+- Brute-force search over integer pixel shifts  
+- Pearson correlation maximization  
+- Overlapping valid pixel masking  
 
-drone-ms-coregistration
-  - ├─ DJI_20251115110614_0003_MS_G (1).tiff
-  - ├─ DJI_20251115110614_0003_MS_R.tiff
-  - ├─ DJI_20251115110614_0003_MS_NIR.tiff
-  - ├─ DJI_3Band_Aligned.tif
-  - ├─ Scripts/
-  - │   └─ drone-ms-coregistration.R
-  - ├─ Output/
-  - └─ README.md
+The best spatial shift `(dx, dy)` is then applied using matrix translation.
 
-  - Scripts/ – Contains the R script for coregistration and visualization.
 
-  
+### 3. NIR Band Alignment (Edge-Based)
 
-## Visualization 
+Due to spectral differences between Red and NIR, direct intensity matching is less effective.
 
-Full-frame composites:
+Instead, alignment is performed using:
 
-Red + Green
-Red + NIR
-Red + Green + NIR
+- Sobel edge detection  
+- Edge-based correlation maximization  
+- Integer pixel shift estimation  
 
-High-variance region composites (to highlight misalignment):
+This improves structural alignment robustness between bands.
 
-Red + Green
-Red + NIR
-Red + Green + NIR
 
-Each visualization shows before (misaligned) vs after (coregistered) alignment.
+### 4. Sub-Pixel Refinement
 
-- Raw TIFF files – Input multispectral bands (Green, Red, NIR).
+After coarse alignment, sub-pixel refinement is performed using:
+
+- `imshift()` from the `imager` package  
+- Local search around the optimal integer shift  
+- Correlation maximization on overlapping pixels  
+
+This achieves approximately 0.1-pixel alignment precision.
+
+
+### 5. Visualization
+
+Aligned stacks are visualized using `plotRGB()`:
+
+- Red + Green  
+- Red + NIR  
+- Green + Red + NIR composite  
+
+Before and after alignment comparisons are provided.
+
+
+## Requirements
+
+Required R packages:
+
+"terra", "imager", "knitr"
+
+## Output
+
+The workflow produces:
+
+Aligned Green raster
+
+Aligned and refined NIR raster
+
+RGB visual comparison panels
+
+Correlation statistics for each alignment stage
 
 ## Author
 Iris Nana Obeng
-(Msc. Global Change Ecology and Sustainable Development)
+MSc. Global Change Ecology and Sustainable Development
