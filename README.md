@@ -132,7 +132,7 @@ The script produces:
 * RGB visual comparisons before and after alignment
 * correlation statistics for each alignment stage
 
-Example output includes:
+Visual output includes:
 
 ```
 Green aligned (dx, dy, correlation)
@@ -141,8 +141,7 @@ NIR refined (dx, dy, correlation)
 ```
 
 
-
 ## Author
 
 **Iris Nana Obeng**
-MSc Global Change Ecology and Sustainable Development
+(MSc Global Change Ecology and Sustainable Development)
