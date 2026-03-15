@@ -2,96 +2,147 @@
 
 ## Overview
 
-This project implements a complete automatic band coregistration workflow for drone-based multispectral imagery using R.
+This project implements an automatic band coregistration workflow for drone-based multispectral imagery using **R**.
 
-The goal is to spatially align:
+The objective is to spatially align the following spectral bands:
 
-- Green band  
-- Red band (reference)  
-- Near-Infrared (NIR) band  
+* **Green**
+* **Red** (reference band)
+* **Near-Infrared (NIR)**
 
-into a geometrically consistent stack suitable for band fusion and vegetation analysis.
+into a geometrically consistent stack suitable for band fusion.
 
-The Red band is used as the spatial reference, while the Green and NIR bands are aligned to it.
+The **Red band** is used as the spatial reference, while the **Green** and **NIR** bands are aligned to it. The workflow performs **coarse alignment followed by sub-pixel refinement**, and provides visual comparisons of the results.
+
+
+
+## Data
+
+The workflow uses three multispectral GeoTIFF files:
+
+* `ms_crop_gre.tif`
+* `ms_crop_red.tif`
+* `ms_crop_nir.tif`
+
+These files are loaded and stacked using the **terra** package.
+
+The expected band order is:
+
+```
+1 = Green
+2 = Red
+3 = NIR
+```
+
 
 
 ## Methodology
 
 ### 1. Data Loading
 
-Multispectral GeoTIFF files are loaded using the `terra` package:
+Multispectral TIFF files are loaded using the **terra** package and combined into a multi-layer raster object for processing.
 
-- `ms_crop_gre.tif`
-- `ms_crop_red.tif`
-- `ms_crop_nir.tif`
+```r
+ms <- rast(files)
+```
 
-These are stacked into a multi-layer raster object for processing.
+Band ordering is explicitly defined to ensure reproducibility across datasets.
 
 
-### 2. Green Band Alignment (Integer Pixel Shift)
 
-The Green band is aligned to the Red band using:
+### 2. Green Band Alignment (Intensity-Based)
 
-- Brute-force search over integer pixel shifts  
-- Pearson correlation maximization  
-- Overlapping valid pixel masking  
+The Green band is aligned to the Red reference band using an **intensity-based approach**:
 
-The best spatial shift `(dx, dy)` is then applied using matrix translation.
+* brute-force search across integer pixel shifts
+* Pearson correlation maximization
+* overlapping valid pixel masking
+
+The optimal shift `(dx, dy)` is then applied using **bilinear interpolation**.
+
+This step corrects the main spatial displacement between the two bands.
+
 
 
 ### 3. NIR Band Alignment (Edge-Based)
 
-Due to spectral differences between Red and NIR, direct intensity matching is less effective.
+Direct intensity matching between Red and NIR bands is often unreliable due to strong spectral differences.
 
-Instead, alignment is performed using:
+To address this, the workflow uses **edge-based registration**:
 
-- Sobel edge detection  
-- Edge-based correlation maximization  
-- Integer pixel shift estimation  
+* Gaussian smoothing of the NIR band
+* Sobel edge detection
+* correlation maximization between edge images
+* integer pixel shift estimation
 
-This improves structural alignment robustness between bands.
+Edge features provide more stable structural information for cross-spectral alignment.
+
 
 
 ### 4. Sub-Pixel Refinement
 
-After coarse alignment, sub-pixel refinement is performed using:
+After coarse alignment, a **local sub-pixel search** refines the NIR alignment.
 
-- `imshift()` from the `imager` package  
-- Local search around the optimal integer shift  
-- Correlation maximization on overlapping pixels  
+The refinement:
 
-This achieves approximately 0.1-pixel alignment precision.
+* searches around the coarse shift
+* tests fractional pixel shifts
+* maximizes correlation on overlapping pixels
+
+This improves the registration accuracy beyond integer pixel resolution.
+
 
 
 ### 5. Visualization
 
-Aligned stacks are visualized using `plotRGB()`:
+Alignment quality is visually evaluated using `plotRGB()`.
 
-- Red + Green  
-- Red + NIR  
-- Green + Red + NIR composite  
+The workflow generates the following comparisons:
 
-Before and after alignment comparisons are provided.
+**Red + Green**
+Before and after alignment.
+
+**Red + NIR**
+Used to evaluate structural alignment between spectral bands.
+
+**Green + Red + NIR composite**
+Full multispectral stack before and after coregistration.
+
+These visualizations help confirm the reduction of spatial ghosting between bands.
+
 
 
 ## Requirements
 
-Required R packages:
+Required R package:
 
-"terra", "imager", "knitr"
+```
+terra
+```
+
+The workflow runs using **base R and the terra package**.
+
 
 ## Output
 
-The workflow produces:
+The script produces:
 
-Aligned Green raster
+* aligned **Green raster**
+* aligned **NIR raster**
+* RGB visual comparisons before and after alignment
+* correlation statistics for each alignment stage
 
-Aligned and refined NIR raster
+Example output includes:
 
-RGB visual comparison panels
+```
+Green aligned (dx, dy, correlation)
+NIR coarse aligned (dx, dy, edge correlation)
+NIR refined (dx, dy, correlation)
+```
 
-Correlation statistics for each alignment stage
+
 
 ## Author
-Iris Nana Obeng
-MSc. Global Change Ecology and Sustainable Development
+
+**Iris Nana Obeng**
+MSc Global Change Ecology and Sustainable Development
