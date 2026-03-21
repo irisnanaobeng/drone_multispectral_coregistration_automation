@@ -7,13 +7,18 @@ date: "2026-03-12"
 
 library(terra)
 
-setwd("~/Desktop/drone ms coregistration")
-
-
 ## Load multispectral bands
 
 ```{r load-images}
-files <- c("ms_crop_gre.tif", "ms_crop_red.tif", "ms_crop_nir.tif")
+
+# Loading images directly from GitHub
+
+files <- c(
+  "https://raw.githubusercontent.com/irisnanaobeng/drone_multispectral_coregistration_automation/main/Data/ms_crop_gre.tif",
+  "https://raw.githubusercontent.com/irisnanaobeng/drone_multispectral_coregistration_automation/main/Data/ms_crop_red.tif",
+  "https://raw.githubusercontent.com/irisnanaobeng/drone_multispectral_coregistration_automation/main/Data/ms_crop_nir.tif"
+)
+
 ms <- rast(files)
 # Layer order: 
 # 1 = Green 
