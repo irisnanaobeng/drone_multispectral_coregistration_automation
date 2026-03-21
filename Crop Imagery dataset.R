@@ -1,12 +1,14 @@
+---
 title: "Drone Multispectral Coregistration (Crop Dataset)"
 author: "Iris Nana Obeng"
 data used: "Crop multispectral TIFFs (Red, Green, NIR) provided by Prof. Duccio Rocchini"
 date: "2026-03-12"
-  
+output: github_document
+---
 
-
+```{r setup, message=FALSE, warning=FALSE}
 library(terra)
-
+```
 ## Load multispectral bands
 
 ```{r load-images}
@@ -26,10 +28,7 @@ ms <- rast(files)
 # 3 = NIR
 names(ms) <- c("Green","Red","NIR")
 
-
 ## Alignment Functions
-
-
 
 align_band_simple <- function(ref_mat, target_mat, max_shift = 20){
   
